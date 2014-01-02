@@ -35,6 +35,8 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.flowpowered.plugins.InvalidPluginException;
 import com.flowpowered.plugins.MutablePluginHandle;
@@ -45,8 +47,11 @@ import com.flowpowered.plugins.PluginLoader;
 import com.flowpowered.plugins.PluginLoaderInfo;
 import com.flowpowered.plugins.PluginManager;
 import com.flowpowered.plugins.PluginState;
+import com.flowpowered.plugins.artifact.jvm.PluginClassLoader;
 
 public abstract class JavaPluginLoader implements PluginLoader {
+    protected static final Pattern VERSION_IN_ERROR = Pattern.compile("([0-9]+)\\.([0-9]+)");
+    protected static final int BASE_CLASS_VERSION = 44;
     private final PluginManager manager;
     private final ClassLoader parent;
     private Map<String, JavaPluginLoaderInfo> infos = new HashMap<>();
@@ -88,13 +93,29 @@ public abstract class JavaPluginLoader implements PluginLoader {
         info.setClassLoader(cl);
         Class<?> main;
         try {
-            main = cl.findClass(pdf.getMain());
+            main = Class.forName(pdf.getMain(), true, cl);
         } catch (ClassNotFoundException e) {
-            throw new InvalidPluginException("Main class not found.", e, file);
+            throw new InvalidPluginException("Main class of plugin " + name + " not found.", e, file);
+        } catch (ExceptionInInitializerError e) {
+            throw new PluginException("Exception in initializer of plugin: " + name, e.getException());
+        } catch (UnsupportedClassVersionError e) {
+            String msg = "";
+            Matcher m = VERSION_IN_ERROR.matcher(e.getMessage());
+            if (m.matches()) {
+                msg = " You need Java version that can support class version " + m.group();
+                try {
+                    int version = Integer.parseInt(m.group(1));
+                    msg += " (most likely Java " + (version - BASE_CLASS_VERSION) + " or newer)";
+                } catch (NumberFormatException ignore) {
+                }
+            }
+            throw new InvalidPluginException("Plugin " + name + " is built for a newer Java version." + msg, e, file);
+        } catch (LinkageError e) {
+            throw new PluginException("Linkage error in plugin: " + name, e);
         }
-        Class<JavaPlugin> jMain = checkPluginMain(handle, main);
+        Class<? extends JavaPlugin> jMain = checkPluginMain(handle, main);
         JavaPlugin plugin;
-        Constructor<JavaPlugin> c;
+        Constructor<? extends JavaPlugin> c;
         try {
             c = jMain.getConstructor();
         } catch (NoSuchMethodException e) {
@@ -155,12 +176,12 @@ public abstract class JavaPluginLoader implements PluginLoader {
     }
 
     @SuppressWarnings("unchecked")
-    protected Class<JavaPlugin> checkPluginMain(PluginHandle handle, Class<?> main) throws InvalidPluginException {
+    protected Class<? extends JavaPlugin> checkPluginMain(PluginHandle handle, Class<?> main) throws InvalidPluginException {
         if (!JavaPlugin.class.isAssignableFrom(main)) {
             throw new InvalidPluginException("Main class of plugin " + handle.getName() + " does not implement JavaPlugin", handle.getFile());
         }
         manager.checkPluginMain(handle, main);
-        return (Class<JavaPlugin>) main;
+        return main.asSubclass(JavaPlugin.class);
     }
 
 }

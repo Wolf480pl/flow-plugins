@@ -27,6 +27,7 @@ import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
 
 import com.flowpowered.plugins.PluginLoaderInfo;
+import com.flowpowered.plugins.artifact.jvm.PluginClassLoader;
 
 public class JavaPluginLoaderInfo implements PluginLoaderInfo {
     private final JavaPluginLoader loader;
