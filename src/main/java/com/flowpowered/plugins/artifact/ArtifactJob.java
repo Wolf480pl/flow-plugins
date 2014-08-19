@@ -1,10 +1,10 @@
 package com.flowpowered.plugins.artifact;
 
-import com.flowpowered.commons.SimpleFuture;
+import java.util.concurrent.Future;
 
-public interface ArtifactJob {
+public interface ArtifactJob<T> {
 
-    SimpleFuture<Object> getFuture();
+    Future<T> getFuture();
 
-    void run(Artifact artifact);
+    void run(ArtifactJobContext ctx);
 }

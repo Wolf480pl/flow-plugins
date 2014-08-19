@@ -1,12 +1,15 @@
 package com.flowpowered.plugins.artifact.jobs;
 
-import com.flowpowered.plugins.artifact.Artifact;
-import com.flowpowered.plugins.artifact.ArtifactState;
+import com.flowpowered.plugins.artifact.ArtifactJobContext;
 
-public class LoadJob extends AbstractJob {
+
+public class LoadJob extends AbstractJob<Void> {
 
     @Override
-    public void run(Artifact artifact) {
+    public Void call(ArtifactJobContext ctx) {
+        ctx.load();
+        return null;
+        /*
         switch (artifact.getState()) {
             case LOADING:
             case LOADED:
@@ -24,6 +27,7 @@ public class LoadJob extends AbstractJob {
         // TODO Auto-generated method stub
         artifact.setStateAndCurrentJob(ArtifactState.LOADED, null);
         future.setResult(null);
+         */
     }
 
 }
