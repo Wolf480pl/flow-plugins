@@ -5,10 +5,10 @@ import com.flowpowered.commons.SimpleFuture;
 import com.flowpowered.plugins.artifact.ArtifactJob;
 
 public abstract class AbstractJob implements ArtifactJob {
-    protected SimpleFuture<?> future = new SimpleFuture<>();
+    protected SimpleFuture<Object> future = new SimpleFuture<>();
 
     @Override
-    public SimpleFuture<?> getFuture() {
+    public SimpleFuture<Object> getFuture() {
         return future;
     }
 

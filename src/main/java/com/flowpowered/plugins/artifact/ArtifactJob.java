@@ -4,7 +4,7 @@ import com.flowpowered.commons.SimpleFuture;
 
 public interface ArtifactJob {
 
-    SimpleFuture<?> getFuture();
+    SimpleFuture<Object> getFuture();
 
     void run(Artifact artifact);
 }

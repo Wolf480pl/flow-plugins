@@ -4,6 +4,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Future;
 
+import com.flowpowered.commons.SimpleFuture;
+
+import com.flowpowered.plugins.artifact.jobs.LoadJob;
 import com.flowpowered.plugins.artifact.jobs.LocateJob;
 import com.flowpowered.plugins.artifact.jobs.RemoveJob;
 
@@ -15,23 +18,33 @@ public class ArtifactManager {
      * Makes the Manager try to find the artifact and start tracking it.
      * @return some Future, whose type will be specified once I figure out what I want it to be
      */
-    public Future<?> locate(String artifactName) {
-        LocateJob job = new LocateJob();
+    public Future<Object> locate(String artifactName) {
+        while (true) {
+            LocateJob job = new LocateJob();
 
-        Artifact newArtifact = new Artifact();
-        newArtifact.getJobQueue().add(job);
+            Artifact newArtifact = new Artifact();
+            newArtifact.getJobQueue().add(job);
 
-        Artifact artifact = byName.putIfAbsent(artifactName, newArtifact);
-        if (artifact == null) {
-            enqueuePulse(artifactName);
-        } else {
-            artifact.getJobQueue().add(job);
+            Artifact artifact = byName.putIfAbsent(artifactName, newArtifact);
+            if (artifact == null) {
+                enqueuePulse(artifactName);
+            } else {
+                artifact.getJobQueue().add(job);
 
-            if (artifact.isGone()) {
-                // Our job might be never processed, so let's try again. Better have 2 jobs than none.
-                // FIXME: Convert this to iteration, or we might get StackOverflows.
-                return locate(artifactName);
+                if (artifact.isGone()) {
+                    // Our job might be never processed, so let's try again. Better have 2 jobs than none.
+                    continue;
+                }
             }
+            return job.getFuture();
+        }
+    }
+
+    public Future<Object> load(Artifact artifact) {
+        LoadJob job = new LoadJob();
+        artifact.getJobQueue().add(job);
+        if (artifact.isGone()) {
+            // TODO: Now what? Maybe we want all jobs use the same mechanism as for locate?
         }
         return job.getFuture();
     }
@@ -56,7 +69,8 @@ public class ArtifactManager {
 
                 for (ArtifactJob j : artifact.getJobQueue()) {
                     if (j instanceof LocateJob) {
-                        locate(artifactName);
+                        SimpleFuture<Object> f = (SimpleFuture<Object>) locate(artifactName);
+                        j.getFuture().merge(f);
                         // TODO: add the rest of the queue to the new artifact?
                         break;
                     }
