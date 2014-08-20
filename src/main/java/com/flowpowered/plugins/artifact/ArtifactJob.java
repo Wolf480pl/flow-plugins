@@ -1,10 +1,10 @@
 package com.flowpowered.plugins.artifact;
 
-import java.util.concurrent.Future;
+import com.flowpowered.plugins.util.ProgressFuture;
 
 public interface ArtifactJob<T> {
 
-    Future<T> getFuture();
+    ProgressFuture<T> getFuture();
 
     void run(ArtifactJobContext ctx);
 }

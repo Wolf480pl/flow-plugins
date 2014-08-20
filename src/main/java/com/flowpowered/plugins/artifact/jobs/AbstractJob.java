@@ -1,15 +1,15 @@
 package com.flowpowered.plugins.artifact.jobs;
 
-import com.flowpowered.commons.SimpleFuture;
-
 import com.flowpowered.plugins.artifact.ArtifactJob;
 import com.flowpowered.plugins.artifact.ArtifactJobContext;
+import com.flowpowered.plugins.util.ProgressFuture;
+import com.flowpowered.plugins.util.ProgressFutureImpl;
 
 public abstract class AbstractJob<T> implements ArtifactJob<T> {
-    private SimpleFuture<T> future = new SimpleFuture<>();
+    private ProgressFutureImpl<T> future = new ProgressFutureImpl<>();
 
     @Override
-    public SimpleFuture<T> getFuture() {
+    public ProgressFuture<T> getFuture() {
         return future;
     }
 

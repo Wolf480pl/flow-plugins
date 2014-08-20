@@ -1,12 +1,12 @@
 package com.flowpowered.plugins.artifact;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Future;
-
-import com.flowpowered.commons.SimpleFuture;
 
 import com.flowpowered.plugins.artifact.jobs.LoadJob;
 import com.flowpowered.plugins.artifact.jobs.LocateJob;
@@ -21,22 +21,25 @@ public class ArtifactManager {
      * @return a Future&ltVoid&gt (not really sure about the &ltVoid&gt part)
      */
     public Future<Void> locate(String artifactName) {
-        return locate(artifactName, null);
+        LocateJob ljob = new LocateJob();
+        locate(artifactName, ljob);
+        return ljob.getFuture();
     }
 
     public <T> Future<T> locateAndSubmitJob(String artifactName, ArtifactJob<T> job) {
-        locate(artifactName, job);
+        if (job == null) {
+            throw new IllegalArgumentException("Job must not be null!");
+        }
+        LocateJob ljob = new LocateJob();
+        locate(artifactName, ljob, job);
         return job.getFuture(); // TODO: are we sure this is the right future to return?
     }
 
-    protected Future<Void> locate(String artifactName, ArtifactJob<?> job) {
-        LocateJob ljob = new LocateJob();
-        List<ArtifactJob<?>> jobs = new ArrayList<>(2);
-        jobs.add(ljob);
-        if (job != null) {
-            jobs.add(job);
-        }
+    protected void locate(String artifactName, ArtifactJob<?>... jobs) {
+        locate(artifactName, Arrays.asList(jobs));
+    }
 
+    protected void locate(String artifactName, List<? extends ArtifactJob<?>> jobs) {
         while (true) {
             Artifact newArtifact = new Artifact();
             newArtifact.getJobQueue().addAll(jobs);
@@ -53,14 +56,12 @@ public class ArtifactManager {
                     continue;
                 }
             }
-            return ljob.getFuture();
         }
     }
 
     public <T> Future<T> submitJob(String artifactName, ArtifactJob<T> job) {
         Artifact artifact = byName.get(artifactName);
         if (artifact == null) {
-            // TODO: Now what?
             return null;
         }
         return submitJob(artifact, job);
@@ -70,8 +71,7 @@ public class ArtifactManager {
         artifact.getJobQueue().add(job);
 
         if (artifact.isGone()) {
-            job.getFuture().cancel(false); // FIXME: Race condition with pulse()? Should we be doing this at all?
-            if (job.getFuture().isCancelled()) {
+            if (job.getFuture().cancel(false)) {
                 return null;
             }
         }
@@ -104,21 +104,23 @@ public class ArtifactManager {
             throw new IllegalStateException("pulsed on nonexistent artifact");
         }
         ArtifactJob<?> job = artifact.getJobQueue().poll();
-        if (job != null && !job.getFuture().isDone()) {
+        if (job != null && job.getFuture().startProgress()) {
             job.run(new JobContext(artifact, job));
 
             if (job instanceof RemoveJob) {
                 byName.remove(artifactName);
                 artifact.makeGone();
 
-                for (ArtifactJob<?> j : artifact.getJobQueue()) {
-                    if (j instanceof LocateJob && !j.getFuture().isDone()) {
-                        SimpleFuture<Void> f = (SimpleFuture<Void>) locate(artifactName);
-                        ((LocateJob) j).getFuture().merge(f);
-                        // TODO: add the rest of the queue to the new artifact?
+                Queue<ArtifactJob<?>> queue = artifact.getJobQueue();
+                ArtifactJob<?> j;
+                do {
+                    j = queue.peek();
+                    if (j instanceof LocateJob) {
+                        locate(artifactName, new ArrayList<>(queue));
                         break;
                     }
-                }
+                    queue.remove();
+                } while (j != null);
 
                 return; // Don't requeue ourselves;
             }
