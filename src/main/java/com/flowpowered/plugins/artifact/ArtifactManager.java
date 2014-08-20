@@ -2,6 +2,7 @@ package com.flowpowered.plugins.artifact;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,10 +12,16 @@ import java.util.concurrent.Future;
 import com.flowpowered.plugins.artifact.jobs.LoadJob;
 import com.flowpowered.plugins.artifact.jobs.LocateJob;
 import com.flowpowered.plugins.artifact.jobs.RemoveJob;
+import com.flowpowered.plugins.artifact.jobs.ResolveJob;
+import com.flowpowered.plugins.artifact.jobs.UnloadJob;
+import com.flowpowered.plugins.util.ProgressFutureImpl;
 
 public class ArtifactManager {
     private ConcurrentMap<String, Artifact> byName = new ConcurrentHashMap<>();
 
+    public Artifact getArtifact(String name) {
+        return byName.get(name);
+    }
 
     /**
      * Makes the Manager try to find the artifact and start tracking it.
@@ -23,6 +30,18 @@ public class ArtifactManager {
     public Future<Void> locate(String artifactName) {
         LocateJob ljob = new LocateJob();
         locate(artifactName, ljob);
+        return ljob.getFuture();
+    }
+
+    public Future<Void> locateAndSubmitJobs(String artifactName, List<? extends ArtifactJob<?>> jobs) {
+        if (jobs == null) {
+            throw new IllegalArgumentException("Jobs must not be null!");
+        }
+        LocateJob ljob = new LocateJob();
+        List<ArtifactJob<?>> allJobs = new ArrayList<>(jobs.size() + 1);
+        allJobs.add(ljob);
+        allJobs.addAll(jobs);
+        locate(artifactName, allJobs);
         return ljob.getFuture();
     }
 
@@ -67,19 +86,53 @@ public class ArtifactManager {
         return submitJob(artifact, job);
     }
 
+    public boolean submitJobs(String artifactName, List<? extends ArtifactJob<?>> jobs) {
+        Artifact artifact = byName.get(artifactName);
+        if (artifact == null) {
+            return false;
+        }
+        return submitJobs(artifact, jobs);
+    }
+
     public <T> Future<T> submitJob(Artifact artifact, ArtifactJob<T> job) {
-        artifact.getJobQueue().add(job);
+        if (job == null) {
+            throw new IllegalArgumentException("Job must not be null");
+        }
+        submitJobs(artifact, Collections.singletonList(job));
+        return job.getFuture();
+    }
+
+    public boolean submitJobs(Artifact artifact, List<? extends ArtifactJob<?>> jobs) {
+        if (jobs == null) {
+            throw new IllegalArgumentException("Jobs must not be null");
+        }
+        if (jobs.isEmpty()) {
+            return false;
+        }
+        if (jobs.contains(null)) {
+            throw new IllegalArgumentException("Jobs must not contain null");
+        }
+
+        artifact.getJobQueue().addAll(jobs);
 
         if (artifact.isGone()) {
-            if (job.getFuture().cancel(false)) {
-                return null;
+            if (jobs.get(0).getFuture().cancel(false)) {
+                return false;
             }
         }
-        return job.getFuture();
+        return true;
     }
 
     public Future<Void> load(Artifact artifact) {
         return submitJob(artifact, new LoadJob());
+    }
+
+    public Future<Void> resolve(Artifact artifact) {
+        return submitJob(artifact, new ResolveJob());
+    }
+
+    public Future<Void> unload(Artifact artifact) {
+        return submitJob(artifact, new UnloadJob());
     }
 
     protected void doLoad(Artifact artifact, ArtifactJob<?> job) {
@@ -119,7 +172,8 @@ public class ArtifactManager {
                         locate(artifactName, new ArrayList<>(queue));
                         break;
                     }
-                    queue.remove();
+                    // TODO: Make sure the cast below is safe
+                    ((ProgressFutureImpl<?>) queue.remove().getFuture()).setThrowable(new ArtifactGoneException("Artifact has been removed before the job's execution."));
                 } while (j != null);
 
                 return; // Don't requeue ourselves;

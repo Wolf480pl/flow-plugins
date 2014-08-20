@@ -2,8 +2,6 @@ package com.flowpowered.plugins.util;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.flowpowered.commons.SimpleFuture;
-
 public class ProgressFutureImpl<T> extends SimpleFuture<T> implements ProgressFuture<T> {
     private final AtomicBoolean started = new AtomicBoolean(false);
 
