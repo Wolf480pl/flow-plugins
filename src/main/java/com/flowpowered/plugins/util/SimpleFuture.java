@@ -24,12 +24,11 @@
 package com.flowpowered.plugins.util;
 
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class SimpleFuture<T> implements Future<T> {
+public class SimpleFuture<T> implements SafeFuture<T> {
 
     private static Object THROWABLE = new Object();
     private static Object CANCEL = new Object();
@@ -60,15 +59,15 @@ public class SimpleFuture<T> implements Future<T> {
         if (result == null) {
             result = (T)NULL;
         }
-        
+
         if (!resultRef.compareAndSet(null, result)) {
             return false;
         }
-        
+
         synchronized (resultRef) {
             resultRef.notifyAll();
         }
-        
+
         return true;
     }
 
@@ -134,5 +133,25 @@ public class SimpleFuture<T> implements Future<T> {
             currentTime = System.currentTimeMillis();
         }
         throw new TimeoutException("Wait duration of " + (currentTime - (endTime - timeoutInMS)) + "ms exceeds timeout of " + timeout + unit.toString());
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public T getResult() {
+        Object result = resultRef.get();
+        if (result == CANCEL || result == NULL || result == THROWABLE) {
+            return null;
+        }
+        return (T) result;
+    }
+
+    @Override
+    public boolean isThrowable() {
+        return resultRef.get() == THROWABLE;
+    }
+
+    @Override
+    public Throwable getThrowable() {
+        return throwable.get();
     }
 }

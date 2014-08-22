@@ -1,10 +1,14 @@
 package com.flowpowered.plugins.artifact;
 
-import com.flowpowered.plugins.util.ProgressFuture;
+import com.flowpowered.plugins.util.SafeProgressFuture;
 
 public interface ArtifactJob<T> {
 
-    ProgressFuture<T> getFuture();
+    SafeProgressFuture<T> getFuture();
 
-    void run(ArtifactJobContext ctx);
+    Result run(ArtifactJobContext ctx);
+
+    public static enum Result {
+        DONE, STALL, FAIL
+    }
 }

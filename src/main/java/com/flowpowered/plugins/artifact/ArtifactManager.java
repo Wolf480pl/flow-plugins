@@ -9,8 +9,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Future;
 
+import org.slf4j.Logger;
+
+import com.flowpowered.plugins.artifact.ArtifactJob.Result;
+import com.flowpowered.plugins.artifact.jobs.AbstractJob;
 import com.flowpowered.plugins.artifact.jobs.LoadJob;
-import com.flowpowered.plugins.artifact.jobs.LocateJob;
 import com.flowpowered.plugins.artifact.jobs.RemoveJob;
 import com.flowpowered.plugins.artifact.jobs.ResolveJob;
 import com.flowpowered.plugins.artifact.jobs.UnloadJob;
@@ -18,6 +21,7 @@ import com.flowpowered.plugins.util.ProgressFutureImpl;
 
 public class ArtifactManager {
     private ConcurrentMap<String, Artifact> byName = new ConcurrentHashMap<>();
+    private Logger logger;
 
     public Artifact getArtifact(String name) {
         return byName.get(name);
@@ -135,18 +139,6 @@ public class ArtifactManager {
         return submitJob(artifact, new UnloadJob());
     }
 
-    protected void doLoad(Artifact artifact, ArtifactJob<?> job) {
-        // TODO: logic goes here
-    }
-
-    protected void doResolve(Artifact artifact, ArtifactJob<?> job) {
-        // TODO: logic goes here
-    }
-
-    protected void doUnload(Artifact artifact, ArtifactJob<?> job) {
-        // TODO: logic goes here
-    }
-
     /**
      * In any given moment this method can be running at most once per artifact
      */
@@ -158,28 +150,41 @@ public class ArtifactManager {
         }
         ArtifactJob<?> job = artifact.getJobQueue().poll();
         if (job != null && job.getFuture().startProgress()) {
-            job.run(new JobContext(artifact, job));
+            Result result = job.run(new JobContext(artifact, job));
 
-            if (job instanceof RemoveJob) {
-                byName.remove(artifactName);
-                artifact.makeGone();
-
-                Queue<ArtifactJob<?>> queue = artifact.getJobQueue();
-                ArtifactJob<?> j;
-                do {
-                    j = queue.peek();
-                    if (j instanceof LocateJob) {
-                        locate(artifactName, new ArrayList<>(queue));
-                        break;
+            switch (result) {
+                case STALL:
+                    return;  // Don't requeue ourselves
+                case DONE:
+                    if (job instanceof RemoveJob) {
+                        doRemove(artifactName, artifact, new ArtifactGoneException("Artifact has been removed before the job's execution."));
+                        return; // Don't requeue ourselves;
                     }
-                    // TODO: Make sure the cast below is safe
-                    ((ProgressFutureImpl<?>) queue.remove().getFuture()).setThrowable(new ArtifactGoneException("Artifact has been removed before the job's execution."));
-                } while (j != null);
-
-                return; // Don't requeue ourselves;
+                    break;
+                case FAIL:
+                    if (job instanceof LocateJob) {
+                        doRemove(artifactName, artifact, new ArtifactGoneException("Could not locate artifact", job.getFuture().getThrowable()));
+                    }
             }
         }
         enqueuePulse(artifactName);
+    }
+
+    protected void doRemove(String artifactName, Artifact artifact, Throwable throwable) {
+        byName.remove(artifactName);
+        artifact.makeGone();
+
+        Queue<ArtifactJob<?>> queue = artifact.getJobQueue();
+        ArtifactJob<?> j;
+        do {
+            j = queue.peek();
+            if (j instanceof LocateJob) {
+                locate(artifactName, new ArrayList<>(queue));
+                break;
+            }
+            // TODO: Make sure the cast below is safe
+            ((ProgressFutureImpl<?>) queue.remove().getFuture()).setThrowable(throwable);
+        } while (j != null);
     }
 
     /**
@@ -188,6 +193,56 @@ public class ArtifactManager {
      */
     protected void enqueuePulse(String artifactName) {
 
+    }
+
+    protected void doLocate(ArtifactJobContext ctx) {
+        Artifact artifact = ctx.getArtifact();
+        // TODO: logic goes here
+        artifact.setStateAndCurrentJob(ArtifactState.LOCATED, null);
+    }
+
+    protected void doLoad(JobContext ctx, ArtifactJobCallback<?> doneCallback) throws ArtifactException {
+        Artifact artifact = ctx.getArtifact();
+        // TODO: Make sure the state is correct
+        artifact.setStateAndCurrentJob(ArtifactState.LOADING, ctx.job);
+        // TODO: logic goes here
+        artifact.setStateAndCurrentJob(ArtifactState.LOADED, null);
+        if (doneCallback != null) {
+            try {
+                doneCallback.call(ctx);
+            } catch (Exception e) {
+                throw new ArtifactException("Exception in callback", e);
+            }
+        }
+    }
+
+    protected void doResolve(JobContext ctx, ArtifactJobCallback<?> doneCallback) throws ArtifactException {
+        Artifact artifact = ctx.getArtifact();
+        // TODO: Make sure the state is correct
+        // TODO: logic goes here
+        artifact.setStateAndCurrentJob(ArtifactState.RESOLVED, null);
+        if (doneCallback != null) {
+            try {
+                doneCallback.call(ctx);
+            } catch (Exception e) {
+                throw new ArtifactException("Exception in callback", e);
+            }
+        }
+    }
+
+    protected void doUnload(JobContext ctx, ArtifactJobCallback<?> doneCallback) throws ArtifactException {
+        Artifact artifact = ctx.getArtifact();
+        // TODO: Make sure the state is correct
+        artifact.setStateAndCurrentJob(ArtifactState.UNLOADING, ctx.job);
+        // TODO: logic goes here
+        artifact.setStateAndCurrentJob(ArtifactState.UNLOADED, null);
+        if (doneCallback != null) {
+            try {
+                doneCallback.call(ctx);
+            } catch (Exception e) {
+                throw new ArtifactException("Exception in callback", e);
+            }
+        }
     }
 
     protected class JobContext implements ArtifactJobContext {
@@ -200,18 +255,33 @@ public class ArtifactManager {
         }
 
         @Override
-        public void load() {
-            doLoad(artifact, job);
+        public void load() throws ArtifactException {
+            load(null);
         }
 
         @Override
-        public void resolve() {
-            doResolve(artifact, job);
+        public void load(ArtifactJobCallback<?> doneCallback) throws ArtifactException {
+            doLoad(this, doneCallback);
         }
 
         @Override
-        public void unload() {
-            doUnload(artifact, job);
+        public void resolve() throws ArtifactException {
+            resolve(null);
+        }
+
+        @Override
+        public void resolve(ArtifactJobCallback<?> doneCallback) throws ArtifactException {
+            doResolve(this, doneCallback);
+        }
+
+        @Override
+        public void unload() throws ArtifactException {
+            unload(null);
+        }
+
+        @Override
+        public void unload(ArtifactJobCallback<?> doneCallback) throws ArtifactException {
+            doUnload(this, doneCallback);
         }
 
         @Override
@@ -220,4 +290,18 @@ public class ArtifactManager {
         }
 
     }
+
+    protected class LocateJob extends AbstractJob<Void> {
+        @Override
+        public Void call(ArtifactJobContext ctx) {
+            Artifact artifact = ctx.getArtifact();
+            if (artifact.getState() != ArtifactState.UNDEFINED) {
+                return null;
+            }
+            doLocate(ctx);
+            return null;
+        }
+
+    }
+
 }

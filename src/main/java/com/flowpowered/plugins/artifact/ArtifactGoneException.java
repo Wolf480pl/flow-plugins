@@ -1,6 +1,6 @@
 package com.flowpowered.plugins.artifact;
 
-public class ArtifactGoneException extends Exception {
+public class ArtifactGoneException extends ArtifactException {
     private static final long serialVersionUID = 4663481841118454245L;
 
     public ArtifactGoneException() {

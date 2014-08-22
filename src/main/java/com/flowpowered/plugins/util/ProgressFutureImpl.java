@@ -2,7 +2,7 @@ package com.flowpowered.plugins.util;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class ProgressFutureImpl<T> extends SimpleFuture<T> implements ProgressFuture<T> {
+public class ProgressFutureImpl<T> extends SimpleFuture<T> implements SafeProgressFuture<T> {
     private final AtomicBoolean started = new AtomicBoolean(false);
 
     @Override

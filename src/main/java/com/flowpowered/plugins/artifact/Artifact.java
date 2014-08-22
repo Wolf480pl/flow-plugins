@@ -8,6 +8,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 public class Artifact {
     private final Queue<ArtifactJob<?>> jobQueue = new ConcurrentLinkedQueue<>();
+    // TODO: Pair<ArtifactStaet, Future<?>> instead?
     private Pair<ArtifactState, ArtifactJob<?>> stateAndJob = new ImmutablePair<>(ArtifactState.UNDEFINED, null);
     private volatile boolean gone = false;
 
