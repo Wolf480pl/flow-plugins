@@ -5,14 +5,14 @@ import com.flowpowered.plugins.artifact.ArtifactJobContext;
 
 
 public class CallbackJob<T> extends AbstractJob<T> {
-    private final ArtifactJobCallback<T> callback;
+    private final ArtifactJobCallback<T, Void> callback;
 
-    public CallbackJob(ArtifactJobCallback<T> callback) {
+    public CallbackJob(ArtifactJobCallback<T, Void> callback) {
         this.callback = callback;
     }
 
     @Override
     protected T call(ArtifactJobContext ctx) throws Exception {
-        return callback.call(ctx);
+        return callback.call(ctx, null);
     }
 }

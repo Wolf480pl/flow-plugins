@@ -5,6 +5,7 @@ import com.flowpowered.plugins.artifact.ArtifactJobCallback;
 import com.flowpowered.plugins.artifact.ArtifactJobContext;
 import com.flowpowered.plugins.artifact.ArtifactState;
 import com.flowpowered.plugins.artifact.WrongStateException;
+import com.flowpowered.plugins.util.ResultOrThrowable;
 
 public class ResolveJob extends AbstractJob<Void> {
 
@@ -34,9 +35,9 @@ public class ResolveJob extends AbstractJob<Void> {
         return null;
     }
 
-    protected ArtifactJobCallback<Void> step2 = new ArtifactJobCallback<Void>() {
+    protected ArtifactJobCallback<Void, Void> step2 = new ArtifactJobCallback<Void, Void>() {
         @Override
-        public Void call(ArtifactJobContext ctx) throws ArtifactException {
+        public Void call(ArtifactJobContext ctx, ResultOrThrowable<Void, ArtifactException> previous) throws ArtifactException {
             return ResolveJob.this.call(ctx);
         }
 

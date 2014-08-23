@@ -1,7 +1,7 @@
 package com.flowpowered.plugins.artifact;
 
 
-public interface ArtifactJobContext {
+public interface ArtifactJobContext extends ArtifactContext {
 
     void load() throws ArtifactException;
 
@@ -9,11 +9,9 @@ public interface ArtifactJobContext {
 
     void unload() throws ArtifactException;
 
-    void unload(ArtifactJobCallback<?> doneCallback) throws ArtifactException;
+    void unload(ArtifactCallback<?, ? super ArtifactJobContext, Void> doneCallback) throws ArtifactException;
 
-    void resolve(ArtifactJobCallback<?> doneCallback) throws ArtifactException;
+    void resolve(ArtifactCallback<?, ? super ArtifactJobContext, Void> doneCallback) throws ArtifactException;
 
-    void load(ArtifactJobCallback<?> doneCallback) throws ArtifactException;
-
-    Artifact getArtifact();
+    void load(ArtifactCallback<?, ? super ArtifactJobContext, Void> doneCallback) throws ArtifactException;
 }
