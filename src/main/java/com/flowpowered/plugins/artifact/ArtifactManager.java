@@ -11,6 +11,8 @@ import com.flowpowered.plugins.artifact.jobs.LoadJob;
 import com.flowpowered.plugins.artifact.jobs.ResolveJob;
 import com.flowpowered.plugins.artifact.jobs.UnloadJob;
 import com.flowpowered.plugins.util.ResultOrThrowable;
+import com.flowpowered.plugins.util.callback.Function;
+import com.flowpowered.plugins.util.callback.ThrowingCatchingFunction;
 
 public class ArtifactManager extends ArtifactTracker {
     private Logger logger;
@@ -64,7 +66,7 @@ public class ArtifactManager extends ArtifactTracker {
         artifact.setStateAndCurrentJob(ArtifactState.LOCATED, null);
     }
 
-    protected void doLoad(JobContext ctx, ArtifactCallback<?, ? super ArtifactJobContext, Void> doneCallback) throws ArtifactException {
+    protected void doLoad(JobContext ctx, ThrowingCatchingFunction<Void, ArtifactException, ?, ? extends Exception> doneCallback) throws ArtifactException {
         Artifact artifact = ctx.getArtifact();
         ArtifactState state = artifact.getState();
         if (!(state == ArtifactState.LOCATED || state == ArtifactState.UNLOADED)) {
@@ -78,14 +80,14 @@ public class ArtifactManager extends ArtifactTracker {
         if (doneCallback != null) {
             try {
                 ResultOrThrowable<Void, ArtifactException> result = ResultOrThrowable.result(null);
-                doneCallback.call(ctx, result);
+                doneCallback.call(result);
             } catch (Exception e) {
                 throw new ArtifactException("Exception in callback", e);
             }
         }
     }
 
-    protected void doResolve(JobContext ctx, ArtifactCallback<?, ? super ArtifactJobContext, Void> doneCallback) throws ArtifactException {
+    protected void doResolve(JobContext ctx, ThrowingCatchingFunction<Void, ArtifactException, ?, ? extends Exception> doneCallback) throws ArtifactException {
         Artifact artifact = ctx.getArtifact();
         ArtifactState state = artifact.getState();
         if (!(state == ArtifactState.LOADED || state == ArtifactState.WAITING_FOR_DEPS || state == ArtifactState.MISSING_DEPS)) {
@@ -97,14 +99,14 @@ public class ArtifactManager extends ArtifactTracker {
         if (doneCallback != null) {
             try {
                 ResultOrThrowable<Void, ArtifactException> result = ResultOrThrowable.result(null);
-                doneCallback.call(ctx, result);
+                doneCallback.call(result);
             } catch (Exception e) {
                 throw new ArtifactException("Exception in callback", e);
             }
         }
     }
 
-    protected void doUnload(JobContext ctx, ArtifactCallback<?, ? super ArtifactJobContext, Void> doneCallback) throws ArtifactException {
+    protected void doUnload(JobContext ctx, ThrowingCatchingFunction<Void, ArtifactException, ?, ? extends Exception> doneCallback) throws ArtifactException {
         Artifact artifact = ctx.getArtifact();
         ArtifactState state = artifact.getState();
         if (!(state == ArtifactState.LOADED || state == ArtifactState.WAITING_FOR_DEPS || state == ArtifactState.MISSING_DEPS || state == ArtifactState.RESOLVED)) {
@@ -117,7 +119,7 @@ public class ArtifactManager extends ArtifactTracker {
         if (doneCallback != null) {
             try {
                 ResultOrThrowable<Void, ArtifactException> result = ResultOrThrowable.result(null);
-                doneCallback.call(ctx, result);
+                doneCallback.call(result);
             } catch (Exception e) {
                 throw new ArtifactException("Exception in callback", e);
             }
@@ -144,7 +146,7 @@ public class ArtifactManager extends ArtifactTracker {
         }
 
         @Override
-        public void load(ArtifactCallback<?, ? super ArtifactJobContext, Void> doneCallback) throws ArtifactException {
+        public void load(ThrowingCatchingFunction<Void, ArtifactException, ?, ? extends Exception> doneCallback) throws ArtifactException {
             doLoad(this, doneCallback);
         }
 
@@ -154,7 +156,7 @@ public class ArtifactManager extends ArtifactTracker {
         }
 
         @Override
-        public void resolve(ArtifactCallback<?, ? super ArtifactJobContext, Void> doneCallback) throws ArtifactException {
+        public void resolve(ThrowingCatchingFunction<Void, ArtifactException, ?, ? extends Exception> doneCallback) throws ArtifactException {
             doResolve(this, doneCallback);
         }
 
@@ -164,7 +166,7 @@ public class ArtifactManager extends ArtifactTracker {
         }
 
         @Override
-        public void unload(ArtifactCallback<?, ? super ArtifactJobContext, Void> doneCallback) throws ArtifactException {
+        public void unload(ThrowingCatchingFunction<Void, ArtifactException, ?, ? extends Exception> doneCallback) throws ArtifactException {
             doUnload(this, doneCallback);
         }
 
@@ -174,20 +176,11 @@ public class ArtifactManager extends ArtifactTracker {
         }
 
         @Override
-        public <T> void doAsync(final ArtifactCallback<T, ArtifactContext, ?> a, final ArtifactCallback<?, ArtifactContext, T> b) {
+        public <T> void doAsync(final Function<Void, ?> function) {
             getSchedulingProvider().runAsync(new Runnable() {
                 @Override
                 public void run() {
-                    /*
-                    ResultOrThrowable<T, Exception> rot;
-                    try {
-                        T result = a.call(JobContext.this, null);
-                        rot = ResultOrThrowable.result(result);
-                    } catch (Exception e) {
-                        rot = ResultOrThrowable.throwable(e);
-                    }
-                    b.call(JobContext.this, rot);
-                     */
+                    function.call(null);
                 }
             });
 

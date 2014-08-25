@@ -1,16 +1,16 @@
 package com.flowpowered.plugins.artifact.jobs;
 
 import com.flowpowered.plugins.artifact.ArtifactException;
-import com.flowpowered.plugins.artifact.ArtifactJobCallback;
 import com.flowpowered.plugins.artifact.ArtifactJobContext;
 import com.flowpowered.plugins.artifact.ArtifactState;
 import com.flowpowered.plugins.artifact.WrongStateException;
 import com.flowpowered.plugins.util.ResultOrThrowable;
+import com.flowpowered.plugins.util.callback.ThrowingCatchingFunction;
 
 public class ResolveJob extends AbstractJob<Void> {
 
     @Override
-    public Void call(ArtifactJobContext ctx) throws ArtifactException {
+    public Void call(final ArtifactJobContext ctx) throws ArtifactException {
         ArtifactState state = ctx.getArtifact().getState();
 
         switch (state) {
@@ -25,7 +25,12 @@ public class ResolveJob extends AbstractJob<Void> {
                 return null;
             case LOCATED:
             case UNLOADED:
-                ctx.load(step2);
+                ctx.load(new ThrowingCatchingFunction<Void, ArtifactException, Void, ArtifactException>() {
+                    @Override
+                    public Void call(ResultOrThrowable<Void, ArtifactException> input) throws ArtifactException {
+                        return ResolveJob.this.call(ctx);
+                    }
+                });
                 return null;
             case LOADED:
             case MISSING_DEPS:
@@ -34,12 +39,4 @@ public class ResolveJob extends AbstractJob<Void> {
         ctx.resolve();
         return null;
     }
-
-    protected ArtifactJobCallback<Void, Void> step2 = new ArtifactJobCallback<Void, Void>() {
-        @Override
-        public Void call(ArtifactJobContext ctx, ResultOrThrowable<Void, ArtifactException> previous) throws ArtifactException {
-            return ResolveJob.this.call(ctx);
-        }
-
-    };
 }

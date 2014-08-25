@@ -1,5 +1,6 @@
 package com.flowpowered.plugins.artifact;
 
+import com.flowpowered.plugins.util.callback.ThrowingCatchingFunction;
 
 public interface ArtifactJobContext extends ArtifactContext {
 
@@ -9,9 +10,9 @@ public interface ArtifactJobContext extends ArtifactContext {
 
     void unload() throws ArtifactException;
 
-    void unload(ArtifactCallback<?, ? super ArtifactJobContext, Void> doneCallback) throws ArtifactException;
+    void unload(ThrowingCatchingFunction<Void, ArtifactException, ?, ? extends Exception> doneCallback) throws ArtifactException;
 
-    void resolve(ArtifactCallback<?, ? super ArtifactJobContext, Void> doneCallback) throws ArtifactException;
+    void resolve(ThrowingCatchingFunction<Void, ArtifactException, ?, ? extends Exception> doneCallback) throws ArtifactException;
 
-    void load(ArtifactCallback<?, ? super ArtifactJobContext, Void> doneCallback) throws ArtifactException;
+    void load(ThrowingCatchingFunction<Void, ArtifactException, ?, ? extends Exception> doneCallback) throws ArtifactException;
 }
